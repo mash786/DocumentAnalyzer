@@ -31,7 +31,7 @@ To run this app locally or deploy it, you need to have the following installed:
 
 
 # Step 1: Clone the repository
-git clone https://github.com/mash786/DocumentAnalyze
+git clone https://github.com/mash786/DocumentAnalyzer
 
 # Step 2: Install required libraries using pip
 pip install streamlit pymupdf python-docx google-generativeai
