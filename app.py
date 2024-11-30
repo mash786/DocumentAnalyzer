@@ -1,16 +1,10 @@
 import streamlit as st
 import fitz  # PyMuPDF for PDF extraction
 import docx  # python-docx for Word file extraction
-import pytesseract  # OCR for images
-from PIL import Image  # PIL for image processing
 import google.generativeai as genai
-from io import BytesIO
 
 # Manually pass the API key for Google Gemini API
 genai.configure(api_key="AIzaSyBOb6KSNm-SUd6UI4GjzFiaJTxUWMoMLNw")
-
-# Set the path to the Tesseract executable
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Streamlit interface
 def main():
@@ -18,13 +12,13 @@ def main():
 
     st.title("Dynamic AI-Driven Document Analysis System")
     st.markdown("""
-    This app allows you to upload different types of documents (PDF, Word, or Image), 
+    This app allows you to upload different types of documents (PDF or Word), 
     and get meaningful analysis, including keyword extraction, summarization, and more.
     """)
     
     # File upload section
     st.subheader("Step 1: Upload Your Document")
-    uploaded_file = st.file_uploader("Upload a Document (PDF, Word, or Image)", type=["pdf", "docx", "jpg", "jpeg", "png"], label_visibility="collapsed")
+    uploaded_file = st.file_uploader("Upload a Document (PDF, Word)", type=["pdf", "docx"], label_visibility="collapsed")
     
     if uploaded_file:
         # Document Processing
@@ -34,8 +28,6 @@ def main():
                 document_text = extract_pdf_text(uploaded_file)
             elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 document_text = extract_docx_text(uploaded_file)
-            elif file_type in ["image/jpeg", "image/png", "image/jpg"]:
-                document_text = extract_text_from_image(uploaded_file)
         
         # Document Preview
         st.subheader("Document Content Preview")
@@ -72,13 +64,6 @@ def extract_docx_text(uploaded_file):
     for para in doc.paragraphs:
         doc_text += para.text + "\n"
     return doc_text
-
-# Extract text from image function using OCR
-def extract_text_from_image(uploaded_file):
-    """Extract text from an image using OCR (pytesseract)."""
-    image = Image.open(uploaded_file)
-    image_text = pytesseract.image_to_string(image)
-    return image_text
 
 # Perform text analysis using Google Gemini API
 def perform_analysis(custom_question, document_text):
