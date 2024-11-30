@@ -4,4 +4,6 @@ python-docx
 pytesseract
 Pillow
 google-generativeai
+pymupdf
+
 
