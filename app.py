@@ -3,8 +3,9 @@ import fitz  # PyMuPDF for PDF extraction
 import docx  # python-docx for Word file extraction
 import google.generativeai as genai
 
-# Manually pass the API key for Google Gemini API
-genai.configure(api_key="Your API Key")
+# Access the API key securely from Streamlit's secrets management
+api_key = st.secrets["general"]["api_key"]
+genai.configure(api_key=api_key)
 
 # Streamlit interface
 def main():
