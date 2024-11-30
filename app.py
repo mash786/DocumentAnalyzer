@@ -4,7 +4,7 @@ import docx  # python-docx for Word file extraction
 import google.generativeai as genai
 
 # Manually pass the API key for Google Gemini API
-genai.configure(api_key="AIzaSyBOb6KSNm-SUd6UI4GjzFiaJTxUWMoMLNw")
+genai.configure(api_key="Your API Key")
 
 # Streamlit interface
 def main():
