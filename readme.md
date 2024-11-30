@@ -1,7 +1,4 @@
-Here's a README.md file for your project:
 
-markdown
-Copy code
 # Dynamic AI-Driven Document Analysis System
 
 ## Overview
