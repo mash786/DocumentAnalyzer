@@ -1,9 +1,7 @@
 streamlit
-fitz
+PyMuPDF
 python-docx
 pytesseract
 Pillow
 google-generativeai
-pymupdf
-
 
