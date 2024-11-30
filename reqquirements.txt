@@ -1,1 +1,7 @@
+streamlit
+fitz
+python-docx
+pytesseract
+Pillow
+google-generativeai
 
