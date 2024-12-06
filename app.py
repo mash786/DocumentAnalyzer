@@ -19,10 +19,7 @@ genai.configure(api_key=api_key)
 def main():
     st.set_page_config(page_title="Dynamic AI-Driven Document Analysis", page_icon=":robot_face:", layout="wide")
     st.title("Dynamic AI-Driven Document Analysis System")
-    st.markdown("""
-    This app allows you to upload multiple documents (PDF or Word),
-    and ask questions based on their content. Each document is analyzed separately.
-    """)
+    st.markdown("""This app allows you to upload multiple documents (PDF or Word), and ask questions based on their content. Each document is analyzed separately.""")
 
     # File upload section
     st.subheader("Step 1: Upload Your Documents")
@@ -40,8 +37,8 @@ def main():
         st.subheader("Step 2: Ask Your Custom Question(s)")
         custom_question = st.text_area("Enter your question(s) related to the documents", placeholder="What would you like to know?", height=100)
 
-        # Buttons for generating answers
-        col1, col2 = st.columns([1, 1])
+        # Buttons for generating answers and comments
+        col1, col2, col3 = st.columns([1, 1, 1])
 
         with col1:
             generate_normal_button = st.button("Generate Answer (Normal Form)")
@@ -49,17 +46,24 @@ def main():
         with col2:
             generate_tabulated_button = st.button("Generate Answer (Tabulated Form)")
 
-        if generate_normal_button or generate_tabulated_button:
-            if custom_question:
-                questions = [q.strip() for q in custom_question.split("\n") if q.strip()]
-                answers = generate_answers_for_multiple_questions(questions, document_chunks, uploaded_files)
+        with col3:
+            generate_comment_button = st.button("Generate Comment")
 
+        if custom_question:
+            questions = [q.strip() for q in custom_question.split("\n") if q.strip()]
+            
+            if generate_normal_button or generate_tabulated_button or generate_comment_button:
+                answers = generate_answers_for_multiple_questions(questions, document_chunks, uploaded_files)
+                
                 if generate_normal_button:
                     st.subheader("Answers (Normal Form):")
                     display_answers_normal(answers, uploaded_files)
                 elif generate_tabulated_button:
                     st.subheader("Answers (Tabulated Form):")
                     display_answers_tabulated(answers, uploaded_files)
+                elif generate_comment_button:
+                    st.subheader("Generated Comments: ")
+                    display_comments(answers, uploaded_files)
             else:
                 st.warning("Please enter a question.")
 
@@ -69,23 +73,40 @@ def display_answers_normal(answers, uploaded_files):
         st.markdown(f"### Question: {question}")
         if relevant_answers:
             for idx, answer in relevant_answers.items():
-                st.markdown(f"**From Document {idx + 1} ({uploaded_files[idx].name}):**\n{answer}\n")
+                st.markdown(f"**From Document {idx + 1} ({uploaded_files[idx].name}):**\nAnswer: {answer}\n")
         else:
             st.markdown("No relevant answers found.")
 
-# Display answers in tabulated format
+# Display answers in tabulated format with only Question, Answer, and Reason columns
 def display_answers_tabulated(answers, uploaded_files):
-    # Prepare the data for the table
+    # Prepare the data for the table with question, answer, and reason
+    table_data = []
+    for question, relevant_answers in answers.items():
+        if relevant_answers:
+            for idx, answer in relevant_answers.items():
+                # Split the answer to separate the reason and answer
+                if " - " in answer:
+                    answer, reason = answer.split(" - ", 1)
+                else:
+                    reason = "No detailed explanation"
+
+                table_data.append([question, answer, reason])  # Include question, answer, and reason
+
+    # Create the dataframe
+    df = pd.DataFrame(table_data, columns=["Question", "Answer", "Reason"])
+    
+    # Display the table
+    st.write(df)
+
+# Display comments in tabulated format
+def display_comments(answers, uploaded_files):
     table_data = []
     for question, relevant_answers in answers.items():
         if relevant_answers:
             for idx, answer in relevant_answers.items():
                 table_data.append([f"Document {idx + 1} ({uploaded_files[idx].name})", question, answer])
 
-    # Create the dataframe
     df = pd.DataFrame(table_data, columns=["Document", "Question", "Answer"])
-    
-    # Display the table
     st.write(df)
 
 # Asynchronously extract text from PDF with OCR support and chunking
@@ -150,15 +171,57 @@ def process_files_concurrently(uploaded_files):
 
 # Perform text analysis using Google Gemini API
 def perform_analysis(question, chunk):
-    context = f"Document Content:\n\n{chunk}\n\nQuestion: {question}\nAnswer the question based on the above document content:"
+    # Include instructions for detailed response
+    context = (
+        f"Document Content:\n\n{chunk}\n\n"
+        f"Question: {question}\n"
+        "Provide a detailed answer based on the document content."
+    )
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(context)
+        # Return the full response text without trimming
         return response.text.strip()
     except Exception as e:
         return f"Error occurred: {e}"
 
-# Generate answers for multiple questions and documents
+# Handle checklist-type questions
+def handle_checklist_question(question, chunk):
+    """Generate answers for checklist-type questions along with a proper explanation."""
+    context = (
+        f"Document Content:\n\n{chunk}\n\n"
+        f"Question: {question}\n"
+        "Provide a detailed 'Yes', 'No', or relevant response based on the document content. "
+        "Additionally, provide a clear explanation (with proper reasoning) for your answer:"
+    )
+    
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(context)
+        response_text = response.text.strip().lower()
+
+        # Determine Yes/No or relevant response based on content
+        if "yes" in response_text:
+            answer = "Yes"
+        elif "no" in response_text:
+            answer = "No"
+        else:
+            answer = "Not specified"
+
+        # Provide a valid explanation rather than a generic message
+        explanation = response_text if answer != "Not specified" else "Unable to find a clear answer"
+
+        # Return both the Yes/No answer and the detailed explanation
+        return answer, explanation
+    except Exception as e:
+        return f"Error occurred: {e}", ""
+
+# Check if the question is checklist-type
+def is_checklist_question(question):
+    checklist_keywords = ["valid", "up to date", "included", "provided"]
+    return any(keyword in question.lower() for keyword in checklist_keywords)
+
+# Generate answers for multiple questions
 def generate_answers_for_multiple_questions(questions, document_chunks, uploaded_files):
     all_answers = {}
     for question in questions:
@@ -169,17 +232,21 @@ def generate_answers_for_multiple_questions(questions, document_chunks, uploaded
 
         for doc_idx, chunks in enumerate(document_chunks):
             if doc_idx in processed_docs:
-                continue  # Skip this document if it already provided an answer for the question
+                continue  # Skip this document if it already contributed an answer
 
-            for chunk in chunks:
-                answer = perform_analysis(question, chunk)
-                if answer:
-                    relevant_answers[doc_idx] = answer
-                    processed_docs.add(doc_idx)  # Mark this document as processed for the question
-                    break  # Break once an answer is found for the document
+            processed_docs.add(doc_idx)
+            doc_name = uploaded_files[doc_idx].name
 
-        # If answers are found, add them; otherwise, return None
-        all_answers[question] = relevant_answers if relevant_answers else None
+            if is_checklist_question(question):
+                # Handle checklist-type questions with detailed explanation
+                answer, explanation = handle_checklist_question(question, chunks[0])
+                relevant_answers[doc_idx] = f"{answer} - {explanation}"
+            else:
+                # Handle normal questions
+                answer = perform_analysis(question, chunks[0])
+                relevant_answers[doc_idx] = answer
+
+        all_answers[question] = relevant_answers
 
     return all_answers
 
