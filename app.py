@@ -72,8 +72,8 @@ def display_answers_normal(answers, uploaded_files):
     for question, relevant_answers in answers.items():
         st.markdown(f"### Question: {question}")
         if relevant_answers:
-            for idx, answer in relevant_answers.items():
-                st.markdown(f"**From Document {idx + 1} ({uploaded_files[idx].name}):**\nAnswer: {answer}\n")
+            for doc_name, answer in relevant_answers.items():
+                st.markdown(f"**Answer from Unified Document:**\nAnswer: {answer}\n")
         else:
             st.markdown("No relevant answers found.")
 
@@ -83,7 +83,7 @@ def display_answers_tabulated(answers, uploaded_files):
     table_data = []
     for question, relevant_answers in answers.items():
         if relevant_answers:
-            for idx, answer in relevant_answers.items():
+            for doc_name, answer in relevant_answers.items():
                 # Split the answer to separate the reason and answer
                 if " - " in answer:
                     answer, reason = answer.split(" - ", 1)
@@ -103,8 +103,8 @@ def display_comments(answers, uploaded_files):
     table_data = []
     for question, relevant_answers in answers.items():
         if relevant_answers:
-            for idx, answer in relevant_answers.items():
-                table_data.append([f"Document {idx + 1} ({uploaded_files[idx].name})", question, answer])
+            for doc_name, answer in relevant_answers.items():
+                table_data.append([f"Unified Document", question, answer])
 
     df = pd.DataFrame(table_data, columns=["Document", "Question", "Answer"])
     st.write(df)
@@ -153,8 +153,8 @@ def chunk_text(text, chunk_size=5000):
 # Cache the file processing to avoid re-running on every interaction
 @st.cache_data
 def process_files_concurrently(uploaded_files):
-    """Process multiple files concurrently."""
-    document_chunks = []
+    """Process multiple files concurrently and merge them into one chunk."""
+    all_chunks = []
     extracted_text = ""
     for uploaded_file in uploaded_files:
         file_type = uploaded_file.type
@@ -164,10 +164,10 @@ def process_files_concurrently(uploaded_files):
             chunks, text = extract_docx_text(uploaded_file)
         else:
             chunks, text = [], ""
-        document_chunks.append(chunks)
+        all_chunks.extend(chunks)  # Merge all chunks into one unified list
         extracted_text += text
 
-    return document_chunks, extracted_text
+    return all_chunks, extracted_text
 
 # Perform text analysis using Google Gemini API
 def perform_analysis(question, chunk):
@@ -224,32 +224,22 @@ def is_checklist_question(question):
 # Generate answers for multiple questions
 def generate_answers_for_multiple_questions(questions, document_chunks, uploaded_files):
     all_answers = {}
+    unified_chunk = " ".join([" ".join(chunk) for chunk in document_chunks])  # Merge all chunks into a unified chunk
+
     for question in questions:
         relevant_answers = {}
 
-        # Keep track of documents already processed for the question
-        processed_docs = set()
-
-        for doc_idx, chunks in enumerate(document_chunks):
-            if doc_idx in processed_docs:
-                continue  # Skip this document if it already contributed an answer
-
-            processed_docs.add(doc_idx)
-            doc_name = uploaded_files[doc_idx].name
-
-            if is_checklist_question(question):
-                # Handle checklist-type questions with detailed explanation
-                answer, explanation = handle_checklist_question(question, chunks[0])
-                relevant_answers[doc_idx] = f"{answer} - {explanation}"
-            else:
-                # Handle normal questions
-                answer = perform_analysis(question, chunks[0])
-                relevant_answers[doc_idx] = answer
+        # Use the unified chunk for the answer generation
+        if is_checklist_question(question):
+            answer, explanation = handle_checklist_question(question, unified_chunk)
+            relevant_answers["Unified Document"] = f"{answer} - {explanation}"
+        else:
+            answer = perform_analysis(question, unified_chunk)
+            relevant_answers["Unified Document"] = answer
 
         all_answers[question] = relevant_answers
 
     return all_answers
 
-# Run the app
 if __name__ == "__main__":
     main()
