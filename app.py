@@ -120,5 +120,5 @@ async def generate_answers_for_multiple_questions(questions, document_texts, upl
     return all_answers
 
 # Run the app
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
