@@ -11,7 +11,7 @@ import asyncio
 from collections import defaultdict
 
 # Set the Tesseract executable path
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract
 
 # Set the OpenAI API key directly
 openai.api_key = st.secrets["general"]["api_key"]  # Replace with your OpenAI API key
