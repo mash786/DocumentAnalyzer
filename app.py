@@ -121,7 +121,7 @@ async def perform_analysis(custom_question, combined_text):
     try:
         prompt = f"Here is the combined document content:\n\n{combined_text}\n\nQuestion: {custom_question}\nAnswer:"
         chat_completion = openai.ChatCompletion.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
         )
         answer = chat_completion['choices'][0]['message']['content'].strip()
