@@ -1,13 +1,14 @@
-import os 
+import os
 import openai
 import streamlit as st
+from concurrent.futures import ThreadPoolExecutor
 import fitz  # PyMuPDF for PDF extraction
 from PIL import Image
 import pytesseract  # Tesseract OCR for image extraction
 import io
 import docx  # python-docx for Word file extraction
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import pandas as pd  # For generating tabulated output
 
 # Set the Tesseract executable path
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -31,48 +32,69 @@ def main():
         st.subheader("Step 2: Ask Your Custom Question(s)")
         custom_question = st.text_area("Enter your question(s) related to the documents", placeholder="What would you like to know?", height=100)
 
-        if st.button("Generate Answer"):
-            if custom_question:
-                with st.spinner("Processing uploaded files and generating answers..."):
-                    # Extract keywords from the question
-                    keywords = extract_keywords_from_question(custom_question)
-                    # Process the files and extract relevant content
-                    combined_text = asyncio.run(process_files_with_keywords(uploaded_files, keywords))
-                    questions = custom_question.split("\n")
-                    # Generate answers concurrently for multiple questions
-                    answers = asyncio.run(generate_answers_for_multiple_questions(questions, combined_text))
-                    st.subheader("Answers:")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Generate Answer (Normal)"):
+                if custom_question:
+                    with st.spinner("Processing uploaded files and generating answers..."):
+                        keywords = extract_keywords_from_question(custom_question)
+                        combined_text = process_files_with_keywords(uploaded_files, keywords)
+                        questions = custom_question.split("\n")
+                        answers = asyncio.run(generate_answers_for_multiple_questions(questions, combined_text))
+                        st.subheader("Answers:")
+                        for question, answer in answers.items():
+                            if answer:
+                                st.markdown(f"**Question:** {question}\n\n**Answer:** {answer}")
+                            else:
+                                st.markdown(f"**Question:** {question} - No relevant answers found.")
+                else:
+                    st.warning("Please enter a question.")
+        
+        with col2:
+            if st.button("Generate Answer (Tabulated)"):
+                if custom_question:
+                    with st.spinner("Processing uploaded files and generating answers..."):
+                        keywords = extract_keywords_from_question(custom_question)
+                        combined_text = process_files_with_keywords(uploaded_files, keywords)
+                        questions = custom_question.split("\n")
+                        answers = asyncio.run(generate_answers_for_multiple_questions(questions, combined_text))
+                        table_data = []
+                        for question, answer in answers.items():
+                            if answer:
+                                reason = "Valid content found."  # Reason can be customized based on answer
+                                table_data.append([question, answer, reason])
+                            else:
+                                table_data.append([question, "No", "No relevant content"])
+                        # Create a pandas DataFrame for the tabular output
+                        df = pd.DataFrame(table_data, columns=["Question", "Answer", "Reason"])
+                        st.subheader("Tabulated Answers:")
+                        st.table(df)
+                else:
+                    st.warning("Please enter a question.")
 
-                    # Display answers in a table
-                    answer_data = []
-                    for question, answer in answers.items():
-                        if "yes" in answer.lower() or "no" in answer.lower() or "maybe" in answer.lower():
-                            answer_data.append([question, answer, "Explanation"])
-                        else:
-                            answer_data.append([question, "No relevant answers found", "No data available"])
+def extract_keywords_from_question(question):
+    """Extract keywords from the custom question using simple heuristics."""
+    common_words = set(["what", "who", "when", "where", "why", "how", "is", "are", "the", "a", "an", "of", "in", "to", "on", "for", "with", "and", "or"])
+    keywords = [word.lower() for word in question.split() if word.lower() not in common_words]
+    return keywords
 
-                    st.table(answer_data)
-
-            else:
-                st.warning("Please enter a question.")
-
-async def process_files_with_keywords(uploaded_files, keywords):
+def process_files_with_keywords(uploaded_files, keywords):
     """Process files and extract relevant text based on keywords."""
-    async def process_file(uploaded_file):
+    def process_file(uploaded_file):
         file_type = uploaded_file.type
         if file_type == "application/pdf":
-            return await extract_pdf_text_with_keywords(uploaded_file, keywords)
+            return extract_pdf_text_with_keywords(uploaded_file, keywords)
         elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            return await extract_docx_text_with_keywords(uploaded_file, keywords)
+            return extract_docx_text_with_keywords(uploaded_file, keywords)
         return ""
 
-    tasks = [process_file(file) for file in uploaded_files]
-    results = await asyncio.gather(*tasks)
-
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(process_file, uploaded_files))
+    
     combined_text = "\n".join(results)
     return combined_text
 
-async def extract_pdf_text_with_keywords(uploaded_file, keywords):
+def extract_pdf_text_with_keywords(uploaded_file, keywords):
     """Extract text from PDF and filter based on keywords."""
     doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
     relevant_text = ""
@@ -94,7 +116,7 @@ async def extract_pdf_text_with_keywords(uploaded_file, keywords):
 
     return relevant_text[:5000]  # Truncate to optimize API calls
 
-async def extract_docx_text_with_keywords(uploaded_file, keywords):
+def extract_docx_text_with_keywords(uploaded_file, keywords):
     """Extract text from a DOCX file and filter based on keywords."""
     doc = docx.Document(uploaded_file)
     relevant_text = ""
@@ -129,12 +151,6 @@ async def perform_analysis(custom_question, combined_text):
         return answer
     except Exception as e:
         return f"Error occurred: {str(e)}"
-
-def extract_keywords_from_question(question):
-    """Extract keywords from the custom question using simple heuristics."""
-    common_words = set(["what", "who", "when", "where", "why", "how", "is", "are", "the", "a", "an", "of", "in", "to", "on", "for", "with", "and", "or"])
-    keywords = [word.lower() for word in question.split() if word.lower() not in common_words]
-    return keywords
 
 if __name__ == "__main__":
     main()
