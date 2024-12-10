@@ -3,5 +3,10 @@ PyMuPDF
 python-docx
 pytesseract
 Pillow
+<<<<<<< Updated upstream
 google-generativeai
 openai==1.57.2
+=======
+openai==1.57.2
+
+>>>>>>> Stashed changes
