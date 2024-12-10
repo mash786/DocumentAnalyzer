@@ -3,4 +3,9 @@ PyMuPDF
 python-docx
 pytesseract
 Pillow
+<<<<<<< HEAD
 openai==1.57.2
+=======
+openai==1.57.2
+
+>>>>>>> 04b7fbe1a8368f5bc28be2a4d62911052517dacb
