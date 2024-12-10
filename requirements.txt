@@ -4,4 +4,4 @@ python-docx
 pytesseract
 Pillow
 google-generativeai
-
+openai==1.57.2
